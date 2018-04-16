@@ -3,7 +3,7 @@ const grab_access_token = require('./auth/google_token_manager').grab_access_tok
 const getEmailsSinceHistoryID = require('./api/gmail_api').getEmailsSinceHistoryID
 const grabAndGroupEmails = require('./api/gmail_api').grabAndGroupEmails
 const determineIfNewContactOrOld = require('./Postgres/Queries/UserQueries').determineIfNewContactOrOld
-const createNewLead = require('./Postgres/Queries/UserQueries').createNewLead
+const create_new_contact_by_email = require('./Postgres/Queries/UserQueries').create_new_contact_by_email
 const getTwilioChannelId = require('./Postgres/Queries/ChatQueries').getTwilioChannelId
 const associate_channel_id = require('./Postgres/Queries/ChatQueries').associate_channel_id
 const create_channel = require('./routes/channel_routes').create_channel
@@ -64,8 +64,9 @@ exports.incoming_email = function(req, res) {
                             }
                           })
                       } else {
-                        return createNewLead(email)
+                        return create_new_contact_by_email(email)
                                   .then((contact) => {
+                                    // contact: { contact_id, }
                                     console.log(contact)
                                     return Promise.resolve(contact)
                                   })
