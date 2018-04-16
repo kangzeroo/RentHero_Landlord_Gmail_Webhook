@@ -12,10 +12,12 @@ exports.incoming_email = function(req, res) {
     let token = ''
     let emails = []
     let corporation_id = ''
+    let user_id = ''
     get_staff_by_email(gmail_payload.emailAddress)
       .then((data) => {
         console.log('===================')
         console.log(data)
+        user_id = data.staff_id
         return grab_access_token(data.staff_id)
       })
       .then((data) => {
@@ -34,7 +36,7 @@ exports.incoming_email = function(req, res) {
       })
       .then((diffs) => {
         const x = diffs.map((email) => {
-          return process_email(email[0].email, corporation_id)
+          return process_email(email[0].email, corporation_id, user_id)
         })
         return Promise.all(x)
       })

@@ -14,12 +14,12 @@ exports.grab_access_token = function(staff_id) {
   const p = new Promise((res, rej) => {
     let refreshToken = ''
     let user_email = ''
-    console.log(staff_id)
+    // console.log(staff_id)
     // query db for a refresh token corresponding to this user's IdentityId
     grab_refresh_token(staff_id)
       .then((data) => {
-        console.log('------------ grab_refresh_token -------------')
-        console.log(data)
+        // console.log('------------ grab_refresh_token -------------')
+        // console.log(data)
         const { email, google_refresh_token, expires_at } = data
         refreshToken = google_refresh_token
         user_email = email
@@ -31,7 +31,7 @@ exports.grab_access_token = function(staff_id) {
         }
       })
       .then(({ email, google_refresh_token, google_access_token, history_id }) => {
-        console.log('------------ grab_access_token SUCCESS -------------')
+        // console.log('------------ grab_access_token SUCCESS -------------')
         // console.log(access_token)
         res({
           user_id: staff_id,

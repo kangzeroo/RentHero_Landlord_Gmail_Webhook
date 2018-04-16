@@ -87,14 +87,14 @@ exports.retrieve_staff_profile = (req, res, next) => {
   get_staff_profile(staff_id)
   .then((staffData) => {
     if (staffData.rowCount === 0) {
-      console.log('0')
+      // console.log('0')
       return insert_staff_profile(staff_id, profile)
       .then((data) => {
         // console.log(data)
         return get_staff_profile(staff_id)
       })
       .then((data) => {
-        console.log(data.data)
+        // console.log(data.data)
         return stringify_rows(data)
       })
       .then((data) => {
@@ -104,14 +104,14 @@ exports.retrieve_staff_profile = (req, res, next) => {
         res.json(data[0])
       })
       .catch((err) => {
-        console.log(err)
+        // console.log(err)
         res.status(500).send(err)
       })
     } else {
-      console.log('1')
+      // console.log('1')
       get_staff_profile(staff_id)
       .then((data) => {
-        console.log(data)
+        // console.log(data)
         return stringify_rows(data)
       })
       .then((data) => {
@@ -138,7 +138,7 @@ const get_staff_profile = (staff_id) => {
       res(data)
     })
     .catch((err) => {
-      console.log(err)
+      // console.log(err)
       rej(err)
     })
 
@@ -158,12 +158,11 @@ exports.grab_refresh_token = function(staff_id) {
 
     return query(grab_token, values)
     .then((data) => {
-      console.log(data
-      )
+      // console.log(data)
       res(data.rows[0])
     })
     .catch((err) => {
-      console.log(err)
+      // console.log(err)
       rej(err)
     })
   })
@@ -171,9 +170,9 @@ exports.grab_refresh_token = function(staff_id) {
 }
 
 exports.update_refresh_token = function(data, staff_id) {
-  console.log('========== update_refresh_token ===========')
-  console.log('staff_id: ', staff_id)
-  console.log(data)
+  // console.log('========== update_refresh_token ===========')
+  // console.log('staff_id: ', staff_id)
+  // console.log(data)
   const p = new Promise((res, rej) => {
     const expires_at = new Date().getTime() + (data.expires_in*1000)
     const values = [staff_id, data.access_token, expires_at]
@@ -185,7 +184,7 @@ exports.update_refresh_token = function(data, staff_id) {
       res('success')
     })
     .catch((err) => {
-      console.log(err)
+      // console.log(err)
       rej(err)
     })
   })
@@ -200,11 +199,11 @@ const insert_staff_profile = (staff_id, profile) => {
 
     return query(insert_profile, values)
     .then((data) => {
-      console.log(data)
+      // console.log(data)
       res('success')
     })
     .catch((err) => {
-      console.log(err)
+      // console.log(err)
       rej(err)
     })
   })
@@ -222,11 +221,11 @@ exports.save_refresh_token_to_database = (access_token, refresh_token, identityI
 
     query(insert_tokens, values)
       .then((data) => {
-        console.log('INSERTED')
+        // console.log('INSERTED')
         res('INSERTED')
       })
       .catch((error) => {
-        console.log(error)
+        // console.log(error)
         rej('bad boi bad boi')
       })
   })

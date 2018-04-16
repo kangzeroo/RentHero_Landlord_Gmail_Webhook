@@ -60,9 +60,9 @@ exports.checkIfWeAskedForTheirPersonalEmailYet = function(text) {
     const already_asked_regex = text.match(/(what is your email?)|(send your email)/ig)
     if (already_asked_regex) {
       // res(true)
-      res(false)
+      res(true)
     } else {
-      res(false)
+      res(true)
     }
   })
   return p
@@ -85,9 +85,10 @@ exports.doesThisEmailMentionTheirPersonalEmail = function(text) {
       })
     }
     if (filtered_emails && filtered_emails.length > 0) {
-      res(filtered_emails[0])
+      // res(filtered_emails[0])
+      res(true)
     } else {
-      res(false)
+      res(true)
     }
   })
   return p
