@@ -39,6 +39,23 @@ exports.determineIfNewContactOrOld = (email) => {
   return p
 }
 
+exports.create_new_contact_by_email = (email) => {
+  const p = new Promise((res, rej) => {
+    const contact_id = uuid.v4()
+    const values = [contact_id, email]
+
+    const insert_contact = `INSERT INTO contact (contact_id, email) VALUES ($1, $2)`
+
+    return query(insert_contact)
+            .then(() => {
+              res({
+                contact_id: contact_id,
+              })
+            })
+  })
+  return p
+}
+
 exports.get_staff_by_email = (email) => {
   const p = new Promise((res, rej) => {
     const values = [email]
