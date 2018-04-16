@@ -26,7 +26,7 @@ exports.determineIfNewContactOrOld = (email) => {
 
     return query(get_contact, values)
       .then((data) => {
-        console.log(data)
+        // console.log(data)
         if (data.rows.length > 0) {
           res({
             contact_id: data.rows[0].contact_id

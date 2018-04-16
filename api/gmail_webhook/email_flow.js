@@ -7,62 +7,58 @@ const analyzeAndReply = require('./nlp').analyzeAndReply
 
 exports.process_email = function(email) {
   const p = new Promise((res, rej) => {
-  console.log(email.html)
-  console.log('============= incomingEmail ================')
-  // receives the email webhook event from Gmail
-  checkIfKnownPersonalEmail(email)
-    .then((known) => {
-      console.log('known: ', known)
-      if (known) {
-        console.log('YES KNOWN')
-        return analyzeAndReply(email)
+    console.log(email.html)
+    console.log('============= incomingEmail ================')
+    // receives the email webhook event from Gmail
+    if (email.known) {
+      console.log('YES KNOWN')
+      analyzeAndReply(email)
+          .then((data) => {
+            console.log(data)
+            res(data)
+          })
+          .catch((err) => {
+            console.log(err)
+            rej(err)
+          })
+    } else {
+      console.log('NOT KNOWN')
+      return checkIfPhoneNumberMentioned(email)
+                .then((includesPhoneNumber) => {
+                  if (includesPhoneNumber) {
+                    return sendRentHeroRedirectSMS(email)
+                  } else {
+                    return checkIfWeAskedForTheirPersonalEmailYet(email)
+                  }
+                })
+                .then((askedYet) => {
+                  if (!askedYet) {
+                    return askForEmailToPersonalRedirect(email)
+                  } else {
+                    return doesThisEmailMentionTheirPersonalEmail(email)
+                  }
+                })
+                .then((mentionsActualEmail) => {
+                  if (!mentionsActualEmail) {
+                    return askForEmailToPersonalRedirect(email)
+                  } else {
+                    return saveEmailToDb(email)
+                  }
+                })
                 .then((data) => {
+                  return sendRentHeroRedirectEmail(email)
+                })
+                .then((data) => {
+                  console.log('======== SUCCESSFULLY PROCESSED ========')
                   console.log(data)
                   res(data)
                 })
                 .catch((err) => {
+                  console.log('======== AN ERROR OCCURRED ========')
                   console.log(err)
                   rej(err)
                 })
-      } else {
-        console.log('NOT KNOWN')
-        return checkIfPhoneNumberMentioned(email)
-      }
-    })
-    .then((includesPhoneNumber) => {
-      if (includesPhoneNumber) {
-        return sendRentHeroRedirectSMS(email)
-      } else {
-        return checkIfWeAskedForTheirPersonalEmailYet(email)
-      }
-    })
-    .then((askedYet) => {
-      if (!askedYet) {
-        return askForEmailToPersonalRedirect(email)
-      } else {
-        return doesThisEmailMentionTheirPersonalEmail(email)
-      }
-    })
-    .then((mentionsActualEmail) => {
-      if (!mentionsActualEmail) {
-        return askForEmailToPersonalRedirect(email)
-      } else {
-        return saveEmailToDb(email)
-      }
-    })
-    .then((data) => {
-      return sendRentHeroRedirectEmail(email)
-    })
-    .then((data) => {
-      console.log('======== SUCCESSFULLY PROCESSED ========')
-      console.log(data)
-      res(data)
-    })
-    .catch((err) => {
-      console.log('======== AN ERROR OCCURRED ========')
-      console.log(err)
-      rej(err)
-    })
+    }
   })
   return p
 }
