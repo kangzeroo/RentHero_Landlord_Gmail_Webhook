@@ -2,6 +2,7 @@ const get_staff_by_email = require('./Postgres/Queries/UserQueries').get_staff_b
 const grab_access_token = require('./auth/google_token_manager').grab_access_token
 const getEmailsSinceHistoryID = require('./api/gmail_api').getEmailsSinceHistoryID
 const grabAndGroupEmails = require('./api/gmail_api').grabAndGroupEmails
+const determineIfNewContactOrOld = require('./Postgres/Queries/UserQueries').determineIfNewContactOrOld
 
 exports.incoming_email = function(req, res) {
   const p = new Promise((res, rej) => {
@@ -25,11 +26,27 @@ exports.incoming_email = function(req, res) {
         return getEmailsSinceHistoryID(token, history_id)
       })
       .then((emailChanges) => {
-        return grabAndGroupEmails(emailChanges, token, corporation_id)
+        if (emailChanges) {
+          return grabAndGroupEmails(emailChanges, token, corporation_id)
+        } else {
+          return Promise.resolve([])
+        }
       })
-      // .then((diffs) => {
-      //   return determineIfNewContactOrOld().then(createOrRetreiveTwilioChannelID).then(saveToS3AndDynamo)
-      // })
+      .then((diffs) => {
+        const x = diffs.map((email) => {
+          return determineIfNewContactOrOld()
+                    .then(() => {
+                      return createOrRetreiveTwilioChannelID()
+                    })
+                    .then(() => {
+                      return saveToS3AndDynamo()
+                    })
+                    .catch((err) => {
+                      return Promise.reject(err)
+                    })
+        })
+        return Promise.all(x)
+      })
       .then((diffs) => {
         res(diffs)
       })

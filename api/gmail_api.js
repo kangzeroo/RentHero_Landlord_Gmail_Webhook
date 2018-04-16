@@ -80,6 +80,7 @@ exports.grabAndGroupEmails = function(emailChanges, access_token, corporation_id
 }
 
 function organizeEmails(emailChanges) {
+  console.log(emailChanges)
   return emailChanges.map((diff) => {
     const email_ids = []
     if (diff.messages && diff.messages.length > 0) {
