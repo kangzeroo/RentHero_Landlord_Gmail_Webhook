@@ -59,10 +59,9 @@ exports.checkIfWeAskedForTheirPersonalEmailYet = function(text) {
     // eg. 'what is your email?', 'send me your email'
     const already_asked_regex = text.match(/(what is your email?)|(send your email)/ig)
     if (already_asked_regex) {
-      // res(true)
       res(true)
     } else {
-      res(true)
+      res(false)
     }
   })
   return p
@@ -85,8 +84,7 @@ exports.doesThisEmailMentionTheirPersonalEmail = function(text) {
       })
     }
     if (filtered_emails && filtered_emails.length > 0) {
-      // res(filtered_emails[0])
-      res(true)
+      res(filtered_emails[0])
     } else {
       res(true)
     }
