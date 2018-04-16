@@ -3,115 +3,143 @@ const sendRentHeroRedirectEmail = require('./webhook_apis').sendRentHeroRedirect
 const sendRentHeroRedirectSMS = require('./webhook_apis').sendRentHeroRedirectSMS
 const askForEmailToPersonalRedirect = require('./webhook_apis').askForEmailToPersonalRedirect
 const analyzeAndReply = require('./nlp').analyzeAndReply
+const create_new_contact_by_email = require('../../Postgres/Queries/UserQueries').create_new_contact_by_email
+const create_channel = require('../../routes/channel_routes').create_channel
+const associate_channel_id = require('../../Postgres/Queries/ChatQueries').associate_channel_id
+const getTwilioChannelId = require('../../Postgres/Queries/ChatQueries').getTwilioChannelId
+const determineIfNewContactOrOld = require('../../Postgres/Queries/UserQueries').determineIfNewContactOrOld
+const extract_phone = require('./extraction_api').extract_phone
+const checkIfWeAskedForTheirPersonalEmailYet = require('./extraction_api').checkIfWeAskedForTheirPersonalEmailYet
+const doesThisEmailMentionTheirPersonalEmail = require('./extraction_api').doesThisEmailMentionTheirPersonalEmail
 
-
-exports.process_email = function(email) {
+exports.process_email = function(email, corporation_id) {
   const p = new Promise((res, rej) => {
-    console.log(email.html)
+    console.log(email)
     console.log('============= incomingEmail ================')
-    // receives the email webhook event from Gmail
-    if (email.known) {
-      console.log('YES KNOWN')
-      analyzeAndReply(email)
-          .then((data) => {
-            console.log(data)
-            res(data)
-          })
-          .catch((err) => {
-            console.log(err)
-            rej(err)
-          })
-    } else {
-      console.log('NOT KNOWN')
-      return checkIfPhoneNumberMentioned(email)
-                .then((includesPhoneNumber) => {
-                  if (includesPhoneNumber) {
-                    return sendRentHeroRedirectSMS(email)
-                  } else {
-                    return checkIfWeAskedForTheirPersonalEmailYet(email)
-                  }
-                })
-                .then((askedYet) => {
-                  if (!askedYet) {
-                    return askForEmailToPersonalRedirect(email)
-                  } else {
-                    return doesThisEmailMentionTheirPersonalEmail(email)
-                  }
-                })
-                .then((mentionsActualEmail) => {
-                  if (!mentionsActualEmail) {
-                    return askForEmailToPersonalRedirect(email)
-                  } else {
-                    return saveEmailToDb(email)
-                  }
-                })
-                .then((data) => {
-                  return sendRentHeroRedirectEmail(email)
-                })
-                .then((data) => {
-                  console.log('======== SUCCESSFULLY PROCESSED ========')
-                  console.log(data)
-                  res(data)
-                })
-                .catch((err) => {
-                  console.log('======== AN ERROR OCCURRED ========')
-                  console.log(err)
-                  rej(err)
-                })
-    }
+    determineIfNewContactOrOld(email)
+      .then((contactObj) => {
+        // { contact_id: 'xxx' } if exists
+        // {} if not exists
+        console.log('----------- determineIfNewContactOrOld -----------')
+        console.log(contactObj)
+        if (contactObj.contact_id) {
+          let channelId = ''
+          return getTwilioChannelId(contactObj.contact_id, corporation_id)
+                          .then((data) => {
+                            // returns obj { channel_id, } if exists, {} if not exists
+                            console.log('----------- getTwilioChannelId -----------')
+                            console.log(data)
+                            if (data.channel_id) {
+                              channelId = data.channel_id
+                              return associate_channel_id(data.channel_id, corporation_id, contactObj.contact_id)
+                            } else {
+                              return create_channel(corporation_id, email, contactObj.contact_id)
+                                      .then((channelData) => {
+                                        channelId = channelData.channelSid
+                                        return associate_channel_id(channelData.channelSid, email, contactObj.contact_id)
+                                      })
+                                      .catch((err) => {
+                                        return Promise.reject(err)
+                                      })
+                            }
+                          })
+                          .then(() => {
+                            email.twilio_channel_id = channelId
+                            analyzeAndReply(email)
+                                .then((data) => {
+                                  console.log(data)
+                                  res(data)
+                                })
+                                .catch((err) => {
+                                  console.log(err)
+                                  rej(err)
+                                })
+                          })
+                          .catch((err) => {
+                            console.log(err)
+                            rej(err)
+                          })
+        } else {
+          console.log('--------- about to extract phone ---------')
+          return extract_phone(email.body).then((phoneNums) => {
+                      if (phoneNums && phoneNums.length > 0) {
+                        console.log('--------- found phones ---------')
+                        email.personal_phone = phoneNums[0]
+                        sendRentHeroRedirectSMS(email)
+                                .then((data) => {
+                                  console.log(data)
+                                  res(data)
+                                })
+                                .catch((err) => {
+                                  console.log(err)
+                                  rej(err)
+                                })
+                      } else {
+                        console.log('--------- no phone ---------')
+                        email.personal_phone = ''
+                        console.log('--------- check for personal email ---------')
+                        return checkIfWeAskedForTheirPersonalEmailYet(email.body)
+                      }
+                    })
+                    .then((askedYet) => {
+                      if (!askedYet) {
+                        askForEmailToPersonalRedirect(email)
+                          .then((data) => {
+                            console.log(data)
+                            res(data)
+                          })
+                          .catch((err) => {
+                            console.log(err)
+                            rej(err)
+                          })
+                      } else {
+                        return doesThisEmailMentionTheirPersonalEmail(email.body)
+                      }
+                    })
+                    .then((personalEmail) => {
+                      if (!personalEmail) {
+                        askForEmailToPersonalRedirect(email)
+                                .then((data) => {
+                                  console.log(data)
+                                  res(data)
+                                })
+                                .catch((err) => {
+                                  console.log(err)
+                                  rej(err)
+                                })
+                      } else {
+                        email.personal_email = personalEmail
+                        sendRentHeroRedirectEmail(email)
+                          .then((data) => {
+                            console.log(data)
+                            res(data)
+                          })
+                          .catch((err) => {
+                            console.log(err)
+                            rej(err)
+                          })
+                      }
+                    })
+                    .catch((err) => {
+                      console.log('======== AN ERROR OCCURRED ========')
+                      console.log(err)
+                      rej(err)
+                    })
+          // return create_new_contact_by_email(email)
+          //           .then((contact) => {
+          //             // contact: { contact_id, }
+          //             console.log(contact)
+          //             return Promise.resolve(contact)
+          //           })
+          //           .catch((err) => {
+          //             return Promise.reject(err)
+          //           })
+        }
+      })
+      .catch((err) => {
+        console.log(err)
+        rej(err)
+      })
   })
   return p
-}
-
-function saveEmailToDb(email) {
-
-}
-
-function checkIfKnownPersonalEmail(email) {
-  // query database of known tenants to see if we recognize the sender
-  // do something
-  console.log('============== checkIfKnownPersonalEmail ==============')
-  return Promise.resolve(false)
-}
-
-// duplicate of extraction_api
-function checkIfPhoneNumberMentioned(email) {
-  console.log('============== checkIfPhoneNumberMentioned ==============')
-  // const phone_regex = /(tel://){1}\d{9,10}/ig
-  // do something
-  return Promise.resolve(false)
-}
-
-function checkIfWeAskedForTheirPersonalEmailYet(email) {
-  console.log('============= checkIfWeAskedForTheirPersonalEmailYet ===============')
-  // step 1, we check if we asked for their personal email yet by regexing known phrases we would have said
-  // eg. 'what is your email?', 'send me your email'
-  const already_asked_regex = email.html.match(/(what is your email?)|(send your email)/ig)
-  console.log(already_asked_regex)
-  // step 2, we decide what to do if we did not get their personal email yet
-  const did_we_ask = 'true or false'
-  // do something
-}
-
-// duplicate of extraction_api
-function doesThisEmailMentionTheirPersonalEmail(email) {
-  // step 1, we parse through the email body for any mention of an email address
-  // const email_regex = /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/ig
-  // in step 1, email_regex may inadvertantly mistake image urls as emails (eg. https://us-east-1.amazon-s3.com/bucket/image@2x.png)
-  // thus in step 2, we check that there are no images
-  // const no_images_regex = /(.svg)|(.png)|(.jpeg)|(.jpg)|(.pdf)|(.woff)|(.gif)|(.html)/ig
-  // next in step 3, we check that this email is not a predicted email (those we know are not the personal email)
-  const known_emails_regex = [
-    // { type: 'kijiji', regex: /(kijiji.ca){1}|(kijiji.com){1}/ig },
-    // { type: 'padmapper', regex: /(padmapper.com){1}/ig },
-    // { type: 'zumper', regex: /(zumper.com){1}/ig },
-    // { type: 'zlead', regex: /(zlead.co){1}/ig },
-  ]
-  const own_proxy_email = 'email.OWN_EMAIL'
-  const surviving_emails = email_regex.filter((emails) => {
-    return 'filter out the no_images_regex, known_emails_regex and own_proxy_email'
-  })
-  // finally in step 4, we expect that the surviving_emails will be the lead's personal email
-  const personal_email = surviving_emails[0]
-  // do something
 }

@@ -46,7 +46,7 @@ exports.create_new_contact_by_email = (email) => {
 
     const insert_contact = `INSERT INTO contact (contact_id, email) VALUES ($1, $2)`
 
-    return query(insert_contact)
+    return query(insert_contact, values)
             .then(() => {
               res({
                 contact_id: contact_id,

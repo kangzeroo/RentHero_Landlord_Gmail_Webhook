@@ -2,11 +2,7 @@ const get_staff_by_email = require('./Postgres/Queries/UserQueries').get_staff_b
 const grab_access_token = require('./auth/google_token_manager').grab_access_token
 const getEmailsSinceHistoryID = require('./api/gmail_api').getEmailsSinceHistoryID
 const grabAndGroupEmails = require('./api/gmail_api').grabAndGroupEmails
-const determineIfNewContactOrOld = require('./Postgres/Queries/UserQueries').determineIfNewContactOrOld
-const create_new_contact_by_email = require('./Postgres/Queries/UserQueries').create_new_contact_by_email
-const getTwilioChannelId = require('./Postgres/Queries/ChatQueries').getTwilioChannelId
-const associate_channel_id = require('./Postgres/Queries/ChatQueries').associate_channel_id
-const create_channel = require('./routes/channel_routes').create_channel
+const process_email = require('./api/gmail_webhook/email_flow').process_email
 
 exports.incoming_email = function(req, res) {
   const p = new Promise((res, rej) => {
@@ -39,55 +35,7 @@ exports.incoming_email = function(req, res) {
       })
       .then((diffs) => {
         const x = diffs.map((email) => {
-          return determineIfNewContactOrOld(email)
-                    .then((contactObj) => {
-                      // { contact_id: 'xxx' } if exists
-                      // {} if not exists
-                      console.log('----------- determineIfNewContactOrOld -----------')
-                      console.log(contactObj)
-                      if (contactObj.contact_id) {
-                        return getTwilioChannelId(contactObj.contact_id, corporation_id)
-                          .then((data) => {
-                            // returns obj { channel_id, } if exists, {} if not exists
-                            console.log('----------- getTwilioChannelId -----------')
-                            console.log(data)
-                            if (data.channel_id) {
-                              return associate_channel_id(data.channel_id, corporation_id, contactObj.contact_id)
-                            } else {
-                              return create_channel(corporation_id, email, contactObj.contact_id)
-                                      .then((channelData) => {
-                                        return associate_channel_id(channelData.channelSid, email, contactObj.contact_id)
-                                      })
-                                      .catch((err) => {
-                                        return Promise.reject(err)
-                                      })
-                            }
-                          })
-                      } else {
-                        return create_new_contact_by_email(email)
-                                  .then((contact) => {
-                                    // contact: { contact_id, }
-                                    console.log(contact)
-                                    return Promise.resolve(contact)
-                                  })
-                                  .catch((err) => {
-                                    return Promise.reject(err)
-                                  })
-                      }
-                    })
-                    .then((data) => {
-                      console.log('----------- processEmail -----------')
-                      console.log(data)
-                      // return saveToS3AndDynamo()
-                    })
-                    .then((data) => {
-                      console.log('----------- processEmail done -----------')
-                      console.log(data)
-                      // return saveToS3AndDynamo()
-                    })
-                    .catch((err) => {
-                      return Promise.reject(err)
-                    })
+          return process_email(email[0].email, corporation_id)
         })
         return Promise.all(x)
       })
