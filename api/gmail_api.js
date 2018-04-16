@@ -7,7 +7,7 @@ const summarizeEmail = require('./email_api').summarizeEmail
 exports.getEmailsSinceHistoryID = function(access_token, historyId) {
   const p = new Promise((res, rej) => {
     console.log('historyId: ', historyId)
-    axios.get(`https://www.googleapis.com/gmail/v1/users/me/history?startHistoryId=${historyId}&historyTypes=messageAdded`, {
+    axios.get(`https://www.googleapis.com/gmail/v1/users/me/history?startHistoryId=${historyId}&historyTypes=messageAdded&labelId=UNREAD`, {
     // axios.get(`https://www.googleapis.com/gmail/v1/users/me/history?startHistoryId=${historyId}`, {
         headers: {
           'Authorization': `Bearer ${access_token}`

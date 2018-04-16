@@ -14,7 +14,7 @@ const checkIfWeAskedForTheirPersonalEmailYet = require('./extraction_api').check
 const doesThisEmailMentionTheirPersonalEmail = require('./extraction_api').doesThisEmailMentionTheirPersonalEmail
 const determineIfRelevantEmail = require('./extraction_api').determineIfRelevantEmail
 
-exports.process_email = function(email, corporation_id) {
+exports.process_email = function(email, corporation_id, user_id) {
   const p = new Promise((res, rej) => {
     console.log(email)
     console.log('============= incomingEmail ================')
@@ -96,7 +96,7 @@ exports.process_email = function(email, corporation_id) {
                     })
                     .then((askedYet) => {
                       if (!askedYet) {
-                        askForEmailToPersonalRedirect(email)
+                        askForEmailToPersonalRedirect(email, user_id)
                           .then((data) => {
                             console.log(data)
                             res(data)
@@ -111,7 +111,7 @@ exports.process_email = function(email, corporation_id) {
                     })
                     .then((personalEmail) => {
                       if (!personalEmail) {
-                        askForEmailToPersonalRedirect(email)
+                        askForEmailToPersonalRedirect(email, user_id)
                                 .then((data) => {
                                   console.log(data)
                                   res(data)
@@ -122,7 +122,7 @@ exports.process_email = function(email, corporation_id) {
                                 })
                       } else {
                         email.personal_email = personalEmail
-                        sendRentHeroRedirectEmail(email)
+                        sendRentHeroRedirectEmail(email, user_id)
                           .then((data) => {
                             console.log(data)
                             return createNewContact(email)
