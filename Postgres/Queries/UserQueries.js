@@ -19,6 +19,26 @@ const log_through = data => {
   return data
 }
 
+exports.determineIfNewContactOrOld = (email) => {
+  const p = new Promise((res, rej) => {
+    const values = [email]
+    const get_contact = `SELECT * FROM contact WHERE email = $1`
+
+    return query(get_contact, values)
+      .then((data) => {
+        console.log(data)
+        if (data.rows.length > 0) {
+          res({
+            contact_id: data.rows[0].contact_id
+          })
+        } else {
+          res({})
+        }
+      })
+  })
+  return p
+}
+
 exports.get_staff_by_email = (email) => {
   const p = new Promise((res, rej) => {
     const values = [email]

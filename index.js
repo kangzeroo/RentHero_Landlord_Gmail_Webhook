@@ -3,6 +3,9 @@ const grab_access_token = require('./auth/google_token_manager').grab_access_tok
 const getEmailsSinceHistoryID = require('./api/gmail_api').getEmailsSinceHistoryID
 const grabAndGroupEmails = require('./api/gmail_api').grabAndGroupEmails
 const determineIfNewContactOrOld = require('./Postgres/Queries/UserQueries').determineIfNewContactOrOld
+const getTwilioChannelId = require('./Postgres/Queries/ChatQueries').getTwilioChannelId
+const associate_channel_id = require('./Postgres/Queries/ChatQueries').associate_channel_id
+const create_channel = require('./routes/channel_routes').create_channel
 
 exports.incoming_email = function(req, res) {
   const p = new Promise((res, rej) => {
@@ -34,9 +37,24 @@ exports.incoming_email = function(req, res) {
       })
       .then((diffs) => {
         const x = diffs.map((email) => {
-          return determineIfNewContactOrOld()
-                    .then(() => {
-                      return createOrRetreiveTwilioChannelID()
+          return determineIfNewContactOrOld(email)
+                    .then((contactObj) => {
+                      // { contact_id: 'xxx' } if exists
+                      // {} if not exists
+                      if (contactObj.contact_id) {
+                        return getTwilioChannelId(contactObj.contact_id, corporation_id)
+                        // returns obj { channel_id, } if exists, {} if not exists
+                          .then((data) => {
+                            if (data.channel_id) {
+                              return associate_channel_id(data.channel_id, corporation_id, contactObj.contact_id)
+                            } else {
+                              return create_channel(corporation_id, email, contactObj.contact_id)
+                                      .then((channelData) => {
+                                        return associate_channel_id(channelData.channelSid, email, contactObj.contact_id)
+                                      })
+                            }
+                          })
+                      }
                     })
                     .then(() => {
                       return saveToS3AndDynamo()
