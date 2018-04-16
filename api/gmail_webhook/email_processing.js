@@ -8,15 +8,24 @@ const create_channel = require('../../routes/channel_routes').create_channel
 const associate_channel_id = require('../../Postgres/Queries/ChatQueries').associate_channel_id
 const getTwilioChannelId = require('../../Postgres/Queries/ChatQueries').getTwilioChannelId
 const determineIfNewContactOrOld = require('../../Postgres/Queries/UserQueries').determineIfNewContactOrOld
+const createNewContact = require('../../Postgres/Queries/UserQueries').createNewContact
 const extract_phone = require('./extraction_api').extract_phone
 const checkIfWeAskedForTheirPersonalEmailYet = require('./extraction_api').checkIfWeAskedForTheirPersonalEmailYet
 const doesThisEmailMentionTheirPersonalEmail = require('./extraction_api').doesThisEmailMentionTheirPersonalEmail
+const determineIfRelevantEmail = require('./extraction_api').determineIfRelevantEmail
 
 exports.process_email = function(email, corporation_id) {
   const p = new Promise((res, rej) => {
     console.log(email)
     console.log('============= incomingEmail ================')
-    determineIfNewContactOrOld(email)
+    determineIfRelevantEmail(email)
+      .then((relevant) => {
+        if (relevant) {
+          return determineIfNewContactOrOld(email)
+        } else {
+          res()
+        }
+      })
       .then((contactObj) => {
         // { contact_id: 'xxx' } if exists
         // {} if not exists
@@ -68,6 +77,10 @@ exports.process_email = function(email, corporation_id) {
                         sendRentHeroRedirectSMS(email)
                                 .then((data) => {
                                   console.log(data)
+                                  return createNewContact(email)
+                                })
+                                .then((data) => {
+                                  console.log(data)
                                   res(data)
                                 })
                                 .catch((err) => {
@@ -110,6 +123,10 @@ exports.process_email = function(email, corporation_id) {
                       } else {
                         email.personal_email = personalEmail
                         sendRentHeroRedirectEmail(email)
+                          .then((data) => {
+                            console.log(data)
+                            return createNewContact(email)
+                          })
                           .then((data) => {
                             console.log(data)
                             res(data)

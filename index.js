@@ -2,7 +2,7 @@ const get_staff_by_email = require('./Postgres/Queries/UserQueries').get_staff_b
 const grab_access_token = require('./auth/google_token_manager').grab_access_token
 const getEmailsSinceHistoryID = require('./api/gmail_api').getEmailsSinceHistoryID
 const grabAndGroupEmails = require('./api/gmail_api').grabAndGroupEmails
-const process_email = require('./api/gmail_webhook/email_flow').process_email
+const process_email = require('./api/gmail_webhook/email_processing').process_email
 
 exports.incoming_email = function(req, res) {
   const p = new Promise((res, rej) => {
@@ -12,7 +12,6 @@ exports.incoming_email = function(req, res) {
     let token = ''
     let emails = []
     let corporation_id = ''
-    // filter messages for only relevant ones
     get_staff_by_email(gmail_payload.emailAddress)
       .then((data) => {
         console.log('===================')

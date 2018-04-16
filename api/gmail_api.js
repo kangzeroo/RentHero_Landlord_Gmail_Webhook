@@ -1,7 +1,7 @@
 const axios = require('axios')
 const MailComposer = require('nodemailer/lib/mail-composer')
 const checkIfThreadAlreadyRepliedTo = require('../Postgres/Queries/UserQueries').checkIfThreadAlreadyRepliedTo
-const incomingEmail = require('./gmail_webhook/email_flow').incomingEmail
+const incomingEmail = require('./gmail_webhook/email_processing').incomingEmail
 const summarizeEmail = require('./email_api').summarizeEmail
 
 exports.getEmailsSinceHistoryID = function(access_token, historyId) {

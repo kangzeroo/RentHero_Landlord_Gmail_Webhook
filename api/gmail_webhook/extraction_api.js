@@ -92,3 +92,7 @@ exports.doesThisEmailMentionTheirPersonalEmail = function(text) {
   })
   return p
 }
+
+exports.determineIfRelevantEmail = function(email) {
+  return Promise.resolve(true)
+}
