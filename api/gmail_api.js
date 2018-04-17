@@ -3,10 +3,12 @@ const MailComposer = require('nodemailer/lib/mail-composer')
 const checkIfThreadAlreadyRepliedTo = require('../Postgres/Queries/UserQueries').checkIfThreadAlreadyRepliedTo
 const incomingEmail = require('./gmail_webhook/email_processing').incomingEmail
 const summarizeEmail = require('./email_api').summarizeEmail
+const updateHistoryId = require('../Postgres/Queries/UserQueries').updateHistoryId
 
-exports.getEmailsSinceHistoryID = function(access_token, historyId) {
+exports.getEmailsSinceHistoryID = function(access_token, historyId, user_id) {
   const p = new Promise((res, rej) => {
     console.log('historyId: ', historyId)
+    let relevants = []
     axios.get(`https://www.googleapis.com/gmail/v1/users/me/history?startHistoryId=${historyId}&historyTypes=messageAdded&labelId=UNREAD`, {
     // axios.get(`https://www.googleapis.com/gmail/v1/users/me/history?startHistoryId=${historyId}`, {
         headers: {
@@ -15,8 +17,31 @@ exports.getEmailsSinceHistoryID = function(access_token, historyId) {
       })
       .then((data) => {
         console.log('--------- getEmailsSinceHistoryID --------')
-        console.log(data.data.history)
-        res(data.data.history)
+        console.log(data.data)
+        const newHistoryId = data.data.historyId
+        if (!data.data.history) {
+          rej('No new emails')
+        } else {
+          relevants = data.data.history.filter((e) => {
+            let personal_inbox = false
+            const all_labels = []
+            e.messagesAdded.forEach((m) => {
+              m.message.labelIds.forEach((l) => {
+                all_labels.push(l)
+              })
+            })
+            all_labels.forEach((lb) => {
+              if (lb === 'CATEGORY_PERSONAL') {
+                personal_inbox = true
+              }
+            })
+            return personal_inbox
+          })
+          return updateHistoryId(user_id, newHistoryId)
+        }
+      })
+      .then((data) => {
+        res(relevants)
       })
       .catch((err) => {
         console.log(err)
@@ -164,7 +189,6 @@ function batchGetEmails(eDiff, access_token, corporation_id) {
     Promise.all(x)
       .then((diffs) => {
         console.log('------------- diffs ---------------')
-        console.log(diffs)
         res(diffs)
       }).catch((err) => {
         console.log('------------- diffs ---------------')

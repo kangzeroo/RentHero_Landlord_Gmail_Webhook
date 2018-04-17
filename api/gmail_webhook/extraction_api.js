@@ -1,4 +1,5 @@
 const phone_lookup = require('./phone_lookup_api').phone_lookup
+const getContactsAndLeadsForCorporation = require('../../Postgres/Queries/UserQueries').getContactsAndLeadsForCorporation
 const match_corporation_phone = require('../../Postgres/Queries/NumberQueries').match_corporation_phone
 
 exports.extract_email = (text) => {
@@ -24,15 +25,15 @@ exports.extract_phone = (text) => {
 
     if (numbers) {
       numbers = numbers.filter((number) => {
-        return number.length >= 10 && number.length <= 12
+        return number.length >= 10 && number.length <= 11
       })
     } else {
       numbers = []
     }
-
     const arrayOfPromises = numbers.map((number) => {
       return phone_lookup(number)
             .then((data) => {
+              console.log(data)
               return Promise.resolve(data)
             })
             .catch((err) => {
@@ -86,12 +87,55 @@ exports.doesThisEmailMentionTheirPersonalEmail = function(text) {
     if (filtered_emails && filtered_emails.length > 0) {
       res(filtered_emails[0])
     } else {
-      res(true)
+      res(false)
     }
   })
   return p
 }
 
-exports.determineIfRelevantEmail = function(email) {
-  return Promise.resolve(true)
+exports.determineIfRelevantEmail = function(email, corporation_id) {
+  const p = new Promise((res, rej) => {
+    // relevant if the email is coming from a known classifieds channel or proxy email domain
+    // irrelevant if the email contains a 'noreply@' or 'no-reply@' email in the reply-to or from headers
+    console.log('========= determineIfRelevantEmail =========')
+    const froms = email.headers.filter((h) => {
+      return h.name === 'Reply-To' || h.name === 'From'
+    }).map((h) => {
+      return h.value
+    })
+
+    const summ_froms = froms.join('')
+    const assumed_email = froms.filter((sum) => {
+                            return sum.match(/(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/)
+                          })[0]
+    if (summ_froms.indexOf('noreply') > -1 || summ_froms.indexOf('no-reply') > -1) {
+      console.log('irrelevant')
+      res(false)
+    } else if (summ_froms.indexOf('zlead.co') > -1 || summ_froms.indexOf('rts.kijiji.ca') > -1 || summ_froms.indexOf('renthero.ca') > -1) {
+      console.log('good -- relevant')
+      res(assumed_email)
+    } else {
+      getContactsAndLeadsForCorporation(corporation_id)
+        .then((whitelist) => {
+          console.log(whitelist)
+          let passWhitelist = false
+          whitelist.forEach((w) => {
+            if (summ_froms.indexOf(w.email) > -1) {
+              passWhitelist = true
+            }
+          })
+          if (passWhitelist) {
+            console.log('good -- relevant')
+            res(assumed_email)
+          } else {
+            console.log('irrelevant')
+            res(false)
+          }
+        }).catch((err) => {
+          console.log('failed-to-get-linked-emails-for-corporation')
+          res(false)
+        })
+    }
+  })
+  return p
 }
