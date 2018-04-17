@@ -19,10 +19,16 @@ const log_through = data => {
   return data
 }
 
-exports.determineIfNewContactOrOld = (email) => {
+exports.determineIfNewPersonalContact = (assumed_email, corporation_id) => {
   const p = new Promise((res, rej) => {
-    const values = [email]
-    const get_contact = `SELECT * FROM contact WHERE email = $1`
+    const values = [corporation_id, assumed_email]
+    // JIMMY: this query should be looking through lead-landlord relationships with PERSONAL emails, not all total contacts or PROXY emails
+    const get_contact = `SELECT b.contact_id, b.first_name, b.last_name, b.email, b.phone
+                           FROM corporation_contact a
+                           INNER JOIN contact b ON a.contact_id = b.contact_id
+                           WHERE a.corporation_id = $1
+                             AND b.email = $2
+    `
 
     return query(get_contact, values)
       .then((data) => {
@@ -32,29 +38,118 @@ exports.determineIfNewContactOrOld = (email) => {
             contact_id: data.rows[0].contact_id
           })
         } else {
-          res({})
+          res({ contact_id: null })
         }
       })
   })
   return p
 }
 
-exports.create_new_contact_by_email = (email) => {
+exports.getContactsAndLeadsForCorporation = (corporation_id) => {
+  const p = new Promise((res, rej) => {
+    const values = [corporation_id]
+
+    // JIMMY: this query should be looking through lead-landlord relationships with PERSONAL emails, not all total contacts or PROXY emails
+    const get_linked = `(SELECT b.email
+                          FROM corporation_contact a
+                          INNER JOIN contact b ON a.contact_id = b.contact_id
+                          WHERE a.corporation_id = $1)
+                         UNION
+                         (SELECT email FROM leads WHERE corporation_id = $1)
+                        `
+
+    return query(get_linked, values)
+      .then((data) => {
+        return stringify_rows(data)
+      })
+      .then((data) => {
+        return json_rows(data)
+      })
+      .then((data) => {
+        res(data)
+      })
+      .catch((err) => {
+        rej(err)
+      })
+  })
+  return p
+}
+
+exports.createNewContact = (contact, corporation_id) => {
+  // contact = { first_name, last_name, email, phone }
+  // need to extract phone or email from email object
   const p = new Promise((res, rej) => {
     const contact_id = uuid.v4()
-    const values = [contact_id, email]
-
-    const insert_contact = `INSERT INTO contact (contact_id, email) VALUES ($1, $2)`
+    const values = [contact_id, contact.first_name, contact.last_name, contact.email, contact.phone]
+    const insert_contact = `INSERT INTO contact (contact_id, first_name, last_name, email, phone) VALUES ($1, $2, $3, $4, $5)`
 
     return query(insert_contact, values)
-            .then(() => {
-              res({
-                contact_id: contact_id,
-              })
+            .then((data) => {
+              const values2 = [contact_id, corporation_id]
+              const insert_relationship = `INSERT INTO corporation_contact (corporation_id, contact_id) VALUES ($2, $1)`
+              return query(insert_relationship, values2)
+            })
+            .then((data) => {
+              res(contact_id)
+            })
+            .catch((err) => {
+              res('')
             })
   })
   return p
 }
+
+exports.updateLeadContactRelationship = (lead_id, contact_id) => {
+  const p = new Promise((res, rej) => {
+    const values = [lead_id, contact_id]
+    const update_relationship = `UPDATE leads SET contact_id = $2 WHERE lead_id = $1`
+
+    return query(update_relationship, values)
+            .then((data) => {
+              res('Success')
+            })
+            .catch((err) => {
+              console.log(err)
+              res('Failed')
+            })
+  })
+  return p
+}
+
+exports.createNewLead = (email, corporation_id) => {
+  const p = new Promise((res, rej) => {
+    const lead_id = uuid.v4()
+    const values = [lead_id, corporation_id, email]
+    const insert_lead = `INSERT INTO leads (lead_id, corporation_id, email) VALUES ($1, $2, $3)`
+
+    return query(insert_lead, values)
+            .then((data) => {
+              res(lead_id)
+            })
+            .catch((err) => {
+              res('')
+            })
+  })
+  return p
+}
+
+// exports.create_new_contact_by_email = (email) => {
+//   const p = new Promise((res, rej) => {
+//     const contact_id = uuid.v4()
+//     const values = [contact_id, email]
+//
+//     const insert_contact = `INSERT INTO contact (contact_id, email) VALUES ($1, $2)`
+//
+//     return query(insert_contact, values)
+//             .then(() => {
+//               res({
+//                 contact_id: contact_id,
+//               })
+//             })
+//   })
+//   return p
+// }
+
 
 exports.get_staff_by_email = (email) => {
   const p = new Promise((res, rej) => {
@@ -223,6 +318,25 @@ exports.save_refresh_token_to_database = (access_token, refresh_token, identityI
       .then((data) => {
         // console.log('INSERTED')
         res('INSERTED')
+      })
+      .catch((error) => {
+        // console.log(error)
+        rej('bad boi bad boi')
+      })
+  })
+  return p
+}
+
+exports.updateHistoryId = (user_id, newHistoryId) => {
+  const p = new Promise((res, rej) => {
+    const values = [user_id, newHistoryId]
+
+    let insert_tokens = `UPDATE google_refresh_tokens SET history_id = $2 WHERE aws_identity_id = $1`
+
+    query(insert_tokens, values)
+      .then((data) => {
+        // console.log('INSERTED')
+        res('updated')
       })
       .catch((error) => {
         // console.log(error)

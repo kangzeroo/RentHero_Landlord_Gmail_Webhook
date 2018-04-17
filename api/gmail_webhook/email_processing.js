@@ -3,12 +3,11 @@ const sendRentHeroRedirectEmail = require('./webhook_apis').sendRentHeroRedirect
 const sendRentHeroRedirectSMS = require('./webhook_apis').sendRentHeroRedirectSMS
 const askForEmailToPersonalRedirect = require('./webhook_apis').askForEmailToPersonalRedirect
 const analyzeAndReply = require('./nlp').analyzeAndReply
-const create_new_contact_by_email = require('../../Postgres/Queries/UserQueries').create_new_contact_by_email
 const create_channel = require('../../routes/channel_routes').create_channel
 const associate_channel_id = require('../../Postgres/Queries/ChatQueries').associate_channel_id
 const getTwilioChannelId = require('../../Postgres/Queries/ChatQueries').getTwilioChannelId
-const determineIfNewContactOrOld = require('../../Postgres/Queries/UserQueries').determineIfNewContactOrOld
-const createNewContact = require('../../Postgres/Queries/UserQueries').createNewContact
+const determineIfNewPersonalContact = require('../../Postgres/Queries/UserQueries').determineIfNewPersonalContact
+const createNewLead = require('../../Postgres/Queries/UserQueries').createNewLead
 const extract_phone = require('./extraction_api').extract_phone
 const checkIfWeAskedForTheirPersonalEmailYet = require('./extraction_api').checkIfWeAskedForTheirPersonalEmailYet
 const doesThisEmailMentionTheirPersonalEmail = require('./extraction_api').doesThisEmailMentionTheirPersonalEmail
@@ -19,19 +18,19 @@ exports.process_email = function(email, corporation_id, user_id) {
     console.log(email)
     console.log('============= incomingEmail ================')
     determineIfRelevantEmail(email)
-      .then((relevant) => {
-        if (relevant) {
-          return determineIfNewContactOrOld(email)
+      .then((assumed_email) => {
+        if (assumed_email) {
+          return determineIfNewPersonalContact(assumed_email)
         } else {
-          res()
+          res('irrelevant email')
         }
       })
       .then((contactObj) => {
         // { contact_id: 'xxx' } if exists
-        // {} if not exists
-        console.log('----------- determineIfNewContactOrOld -----------')
+        // { contact_id: null } if not exists
+        console.log('----------- determineIfNewPersonalContact -----------')
         console.log(contactObj)
-        if (contactObj.contact_id) {
+        if (contactObj && contactObj.contact_id) {
           let channelId = ''
           return getTwilioChannelId(contactObj.contact_id, corporation_id)
                           .then((data) => {
@@ -68,20 +67,20 @@ exports.process_email = function(email, corporation_id, user_id) {
                             console.log(err)
                             rej(err)
                           })
-        } else {
+        } else if (contactObj) {
           console.log('--------- about to extract phone ---------')
           return extract_phone(email.body).then((phoneNums) => {
                       if (phoneNums && phoneNums.length > 0) {
                         console.log('--------- found phones ---------')
                         email.personal_phone = phoneNums[0]
-                        sendRentHeroRedirectSMS(email)
+                        sendRentHeroRedirectSMS(email, '+15195726998', corporation_id)
                                 .then((data) => {
-                                  console.log(data)
-                                  return createNewContact(email)
+                                  // console.log(data)
+                                  return createNewLead(email, corporation_id)
                                 })
                                 .then((data) => {
                                   console.log(data)
-                                  res(data)
+                                  res('sent-redirect-sms')
                                 })
                                 .catch((err) => {
                                   console.log(err)
@@ -91,30 +90,31 @@ exports.process_email = function(email, corporation_id, user_id) {
                         console.log('--------- no phone ---------')
                         email.personal_phone = ''
                         console.log('--------- check for personal email ---------')
-                        return checkIfWeAskedForTheirPersonalEmailYet(email.body)
-                      }
-                    })
-                    .then((askedYet) => {
-                      if (!askedYet) {
-                        askForEmailToPersonalRedirect(email, user_id)
-                          .then((data) => {
-                            console.log(data)
-                            res(data)
-                          })
-                          .catch((err) => {
-                            console.log(err)
-                            rej(err)
-                          })
-                      } else {
                         return doesThisEmailMentionTheirPersonalEmail(email.body)
                       }
                     })
+                    // .then((askedYet) => {
+                    //   return checkIfWeAskedForTheirPersonalEmailYet(email.body)
+                    //   if (!askedYet) {
+                    //     askForEmailToPersonalRedirect(email, user_id)
+                    //       .then((data) => {
+                    //         console.log(data)
+                    //         res(data)
+                    //       })
+                    //       .catch((err) => {
+                    //         console.log(err)
+                    //         rej(err)
+                    //       })
+                    //   } else {
+                    //     return doesThisEmailMentionTheirPersonalEmail(email.body)
+                    //   }
+                    // })
                     .then((personalEmail) => {
                       if (!personalEmail) {
                         askForEmailToPersonalRedirect(email, user_id)
                                 .then((data) => {
                                   console.log(data)
-                                  res(data)
+                                  res('asked-for-personal-contact')
                                 })
                                 .catch((err) => {
                                   console.log(err)
@@ -122,14 +122,13 @@ exports.process_email = function(email, corporation_id, user_id) {
                                 })
                       } else {
                         email.personal_email = personalEmail
-                        sendRentHeroRedirectEmail(email, user_id)
+                        sendRentHeroRedirectEmail(email, user_id, corporation_id)
                           .then((data) => {
                             console.log(data)
-                            return createNewContact(email)
+                            return createNewLead(email, 'staff-id')
                           })
                           .then((data) => {
-                            console.log(data)
-                            res(data)
+                            res('sent-redirect-email')
                           })
                           .catch((err) => {
                             console.log(err)
@@ -142,15 +141,8 @@ exports.process_email = function(email, corporation_id, user_id) {
                       console.log(err)
                       rej(err)
                     })
-          // return create_new_contact_by_email(email)
-          //           .then((contact) => {
-          //             // contact: { contact_id, }
-          //             console.log(contact)
-          //             return Promise.resolve(contact)
-          //           })
-          //           .catch((err) => {
-          //             return Promise.reject(err)
-          //           })
+        } else {
+          res('irrelevant email')
         }
       })
       .catch((err) => {

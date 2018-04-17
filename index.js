@@ -25,7 +25,7 @@ exports.incoming_email = function(req, res) {
         const { access_token, history_id } = data
         token = access_token
         corporation_id = 'MOCK_CORPORATION_ID'
-        return getEmailsSinceHistoryID(token, history_id)
+        return getEmailsSinceHistoryID(token, history_id, user_id)
       })
       .then((emailChanges) => {
         if (emailChanges) {
@@ -42,12 +42,10 @@ exports.incoming_email = function(req, res) {
       })
       .then((diffs) => {
         res(diffs)
+        //   // res.status(200).send({
+        //   //   message: 'success'
+        //   // })
       })
-      // .then((data) => {
-      //   // res.status(200).send({
-      //   //   message: 'success'
-      //   // })
-      // })
       .catch((err) => {
         console.log(err)
         res(err)
