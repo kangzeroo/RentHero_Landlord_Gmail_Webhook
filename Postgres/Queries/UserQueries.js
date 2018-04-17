@@ -85,9 +85,9 @@ exports.createNewContact = (contact, corporation_id) => {
     const insert_contact = `INSERT INTO contact (contact_id, first_name, last_name, email, phone)
                                  VALUES ($1, $2, $3, $4, $5)
                                 ON CONFLICT (email) DO
-                                UPDATE SET email = $4
+                                UPDATE SET email = $4, updated_at = CURRENT_TIMESTAMP
                                 ON CONFLICT (phone) DO
-                                UPDATE SET phone = $5
+                                UPDATE SET phone = $5, updated_at = CURRENT_TIMESTAMP
                                 RETURNING contact_id
                            `
 
@@ -97,7 +97,8 @@ exports.createNewContact = (contact, corporation_id) => {
               const values2 = [data.rows[0].contact_id, corporation_id]
               const insert_relationship = `INSERT INTO corporation_contact (corporation_id, contact_id)
                                                 VALUES ($2, $1)
-                                              ON CONFLICT (corporation_id, contact_id) DO NOTHING
+                                              ON CONFLICT (corporation_id, contact_id) DO
+                                                UPDATE SET updated_at = CURRENT_TIMESTAMP
                                           `
               return query(insert_relationship, values2)
             })
@@ -135,9 +136,9 @@ exports.createNewLead = (first_name, last_name, email, phone, corporation_id) =>
     const insert_lead = `INSERT INTO leads (lead_id, corporation_id, first_name, last_name, email, phone)
                               VALUES ($1, $2, $3, $4, $5, $6)
                             ON CONFLICT (corporation_id, email) DO
-                            UPDATE SET email = $5
+                            UPDATE SET email = $5, updated_at = CURRENT_TIMESTAMP
                             ON CONFLICT (corporation_id, phone) DO
-                            UPDATE SET phone = $6
+                            UPDATE SET phone = $6, updated_at = CURRENT_TIMESTAMP
                             RETURNING lead_id
                          `
 
