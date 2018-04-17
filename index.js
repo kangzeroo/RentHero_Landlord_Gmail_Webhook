@@ -13,18 +13,19 @@ exports.incoming_email = function(req, res) {
     let emails = []
     let corporation_id = ''
     let user_id = ''
+
     get_staff_by_email(gmail_payload.emailAddress)
       .then((data) => {
         console.log('===================')
         console.log(data)
         user_id = data.staff_id
+        corporation_id = data.corporation_id
         return grab_access_token(data.staff_id)
       })
       .then((data) => {
         console.log(data)
         const { access_token, history_id } = data
         token = access_token
-        corporation_id = 'MOCK_CORPORATION_ID'
         return getEmailsSinceHistoryID(token, history_id, user_id)
       })
       .then((emailChanges) => {
@@ -35,6 +36,7 @@ exports.incoming_email = function(req, res) {
         }
       })
       .then((diffs) => {
+        // res(diffs)
         const x = diffs.map((email) => {
           return process_email(email[0].email, corporation_id, user_id)
         })

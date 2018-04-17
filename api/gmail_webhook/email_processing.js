@@ -12,6 +12,7 @@ const extract_phone = require('./extraction_api').extract_phone
 const checkIfWeAskedForTheirPersonalEmailYet = require('./extraction_api').checkIfWeAskedForTheirPersonalEmailYet
 const doesThisEmailMentionTheirPersonalEmail = require('./extraction_api').doesThisEmailMentionTheirPersonalEmail
 const determineIfRelevantEmail = require('./extraction_api').determineIfRelevantEmail
+const generateObjectFromEmail = require('../email_api').generateObjectFromEmail
 
 exports.process_email = function(email, corporation_id, user_id) {
   const p = new Promise((res, rej) => {
@@ -73,10 +74,14 @@ exports.process_email = function(email, corporation_id, user_id) {
                       if (phoneNums && phoneNums.length > 0) {
                         console.log('--------- found phones ---------')
                         email.personal_phone = phoneNums[0]
-                        sendRentHeroRedirectSMS(email, '+15195726998', corporation_id)
+                        // sendRentHeroRedirectSMS(email, '+15195726998', corporation_id)
+                        sendRentHeroRedirectSMS(email, email.personal_phone, corporation_id)
+                                .then((data) => {
+                                  return generateObjectFromEmail(email)
+                                })
                                 .then((data) => {
                                   // console.log(data)
-                                  return createNewLead(email, corporation_id)
+                                  return createNewLead(data.first_name, data.last_name, data.email, email.personal_phone, corporation_id)
                                 })
                                 .then((data) => {
                                   console.log(data)
@@ -124,8 +129,11 @@ exports.process_email = function(email, corporation_id, user_id) {
                         email.personal_email = personalEmail
                         sendRentHeroRedirectEmail(email, user_id, corporation_id)
                           .then((data) => {
+                            return generateObjectFromEmail(email)
+                          })
+                          .then((data) => {
                             console.log(data)
-                            return createNewLead(email, 'staff-id')
+                            return createNewLead(data.first_name, data.last_name, data.email, data.phone, corporation_id)
                           })
                           .then((data) => {
                             res('sent-redirect-email')

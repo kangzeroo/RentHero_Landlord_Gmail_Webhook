@@ -4,6 +4,8 @@ const simpleParser = require('mailparser').simpleParser
 const uploadToS3 = require('./aws_s3').uploadToS3
 const bulkInsertEmailSummariesIntoDynamoDB = require('../DynamoDB/aws_dynamodb').bulkInsertEmailSummariesIntoDynamoDB
 const createTwilioChannel = require('./gmail_webhook/twilio_api').createTwilioChannel
+const extract_phone = require('./gmail_webhook/extraction_api').extract_phone
+const extract_email = require('./gmail_webhook/extraction_api').extract_email
 
 exports.getReleventThreads = function(access_token) {
   const past5Days = moment().subtract(3, 'days').format('gggg/MM/DD')
@@ -118,6 +120,33 @@ exports.saveEmails = function(convo_summaries, user_id) {
         console.log(err)
         rej(err)
       })
+  })
+  return p
+}
+
+exports.generateObjectFromEmail = function(email) {
+  const p = new Promise((res, rej) => {
+    // contact = { first_name, last_name, email, phone }
+    // console.log(email)
+    const from_string = email.headers.filter((head) => {
+      return head.name === 'From'
+    })[0].value
+    const email_string = from_string.match(/(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/)[0]
+    const name = from_string.slice(0, from_string.indexOf('<') - 1).split(' ')
+    const first_name = name[0]
+    const last_name = name[1]
+    // let email
+
+    extract_phone(email.body)
+    .then((phoneNums) => {
+      const contactObj = {
+        first_name: first_name,
+        last_name: last_name,
+        email: email_string,
+        phone: phoneNums[0],
+      }
+      res(contactObj)
+    })
   })
   return p
 }
