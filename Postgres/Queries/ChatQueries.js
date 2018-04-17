@@ -41,6 +41,7 @@ exports.getTwilioChannelId = (contact_id, corporation_id) => {
 exports.associate_channel_id = (channel_id, corporation_id, contact_id) => {
   const p = new Promise((res, rej) => {
     const values = [channel_id, corporation_id, contact_id]
+    console.log(values)
     const insert_channel_id = `INSERT INTO chat_channels (channel_id, corporation_id, contact_id)
                                     VALUES ($1, $2, $3)
                                   ON CONFLICT (channel_id, corporation_id, contact_id) DO NOTHING
@@ -48,7 +49,12 @@ exports.associate_channel_id = (channel_id, corporation_id, contact_id) => {
 
     return query(insert_channel_id, values)
     .then(() => {
+      console.log('SQL ==> Associated Channel Id With Corporation')
       res('Success')
+    })
+    .catch((err) => {
+      console.log('SQL ==> Failed to associated channel id with corporation')
+      rej(err)
     })
   })
   return p
@@ -60,8 +66,8 @@ exports.get_chat_service_id = (corporation_id) => {
     const get_match = `SELECT chat_service_id FROM corporation_details WHERE corporation_id = $1`
 
     const return_rows = (rows) => {
-      console.log(rows)
-            return rows[0]
+      // console.log(rows)
+            res(rows[0])
           }
     return query(get_match, values)
       .then((data) => {
