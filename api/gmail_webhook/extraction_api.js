@@ -1,5 +1,5 @@
 const phone_lookup = require('./phone_lookup_api').phone_lookup
-const getContactsAndLeadsForCorporation = require('../../Postgres/Queries/UserQueries').getContactsAndLeadsForCorporation
+const getContactsAndLeadsEmailsForCorporation = require('../../Postgres/Queries/UserQueries').getContactsAndLeadsEmailsForCorporation
 const match_corporation_phone = require('../../Postgres/Queries/NumberQueries').match_corporation_phone
 
 exports.extract_email = (text) => {
@@ -115,7 +115,7 @@ exports.determineIfRelevantEmail = function(email, corporation_id) {
       console.log('good -- relevant')
       res(assumed_email)
     } else {
-      getContactsAndLeadsForCorporation(corporation_id)
+      getContactsAndLeadsEmailsForCorporation(corporation_id)
         .then((whitelist) => {
           console.log(whitelist)
           let passWhitelist = false

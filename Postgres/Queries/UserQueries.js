@@ -2,7 +2,6 @@ const Promise = require('bluebird')
 const { promisify } = Promise
 const pool = require('../db_connect')
 const uuid = require('uuid')
-
 // to run a query we just pass it to the pool
 // after we're done nothing has to be taken care of
 // we don't have to return any client to the pool or close a connection
@@ -45,7 +44,7 @@ exports.determineIfNewPersonalContact = (assumed_email, corporation_id) => {
   return p
 }
 
-exports.getContactsAndLeadsForCorporation = (corporation_id) => {
+exports.getContactsAndLeadsEmailsForCorporation = (corporation_id) => {
   const p = new Promise((res, rej) => {
     const values = [corporation_id]
 
@@ -79,14 +78,25 @@ exports.createNewContact = (contact, corporation_id) => {
   // contact = { first_name, last_name, email, phone }
   // need to extract phone or email from email object
   const p = new Promise((res, rej) => {
-    const contact_id = uuid.v4()
+    let contact_id = uuid.v4()
     const values = [contact_id, contact.first_name, contact.last_name, contact.email, contact.phone]
-    const insert_contact = `INSERT INTO contact (contact_id, first_name, last_name, email, phone) VALUES ($1, $2, $3, $4, $5)`
+    const insert_contact = `INSERT INTO contact (contact_id, first_name, last_name, email, phone)
+                                 VALUES ($1, $2, $3, $4, $5)
+                                ON CONFLICT (email) DO
+                                UPDATE SET email = $4
+                                ON CONFLICT (phone) DO
+                                UPDATE SET phone = $5
+                                RETURNING contact_id
+                           `
 
     return query(insert_contact, values)
             .then((data) => {
-              const values2 = [contact_id, corporation_id]
-              const insert_relationship = `INSERT INTO corporation_contact (corporation_id, contact_id) VALUES ($2, $1)`
+              contact_id = data.rows[0].contact_id
+              const values2 = [data.rows[0].contact_id, corporation_id]
+              const insert_relationship = `INSERT INTO corporation_contact (corporation_id, contact_id)
+                                                VALUES ($2, $1)
+                                              ON CONFLICT (corporation_id, contact_id) DO NOTHING
+                                          `
               return query(insert_relationship, values2)
             })
             .then((data) => {
@@ -116,15 +126,22 @@ exports.updateLeadContactRelationship = (lead_id, contact_id) => {
   return p
 }
 
-exports.createNewLead = (email, corporation_id) => {
+exports.createNewLead = (first_name, last_name, email, phone, corporation_id) => {
   const p = new Promise((res, rej) => {
     const lead_id = uuid.v4()
-    const values = [lead_id, corporation_id, email]
-    const insert_lead = `INSERT INTO leads (lead_id, corporation_id, email) VALUES ($1, $2, $3)`
+    const values = [lead_id, corporation_id, first_name, last_name, email, phone]
+    const insert_lead = `INSERT INTO leads (lead_id, corporation_id, first_name, last_name, email, phone)
+                              VALUES ($1, $2, $3, $4, $5, $6)
+                            ON CONFLICT (corporation_id, email) DO
+                            UPDATE SET email = $5
+                            ON CONFLICT (corporation_id, phone) DO
+                            UPDATE SET phone = $6
+                            RETURNING lead_id
+                         `
 
     return query(insert_lead, values)
             .then((data) => {
-              res(lead_id)
+              res(data.rows[0].lead_id)
             })
             .catch((err) => {
               res('')
@@ -154,7 +171,13 @@ exports.createNewLead = (email, corporation_id) => {
 exports.get_staff_by_email = (email) => {
   const p = new Promise((res, rej) => {
     const values = [email]
-    let get_staff = `SELECT * FROM staff WHERE email = $1`
+    let get_staff = `SELECT a.staff_id, a.first_name, a.last_name, a.email, a.phone,
+                            b.corporation_id
+                       FROM staff a
+                       INNER JOIN staff_corporation b
+                       ON a.staff_id = b.staff_id
+                       WHERE a.email = $1
+                     `
 
     return query(get_staff, values)
       .then((data) => {

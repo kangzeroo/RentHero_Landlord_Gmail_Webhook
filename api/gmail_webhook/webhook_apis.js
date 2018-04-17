@@ -5,6 +5,7 @@ const config = require('../../src/config')
 const createNewContact = require('../../Postgres/Queries/UserQueries').createNewContact
 const Twilio = require('twilio').Twilio;
 const extract_phone = require('./extraction_api').extract_phone
+const extract_email = require('./extraction_api').extract_email
 const client = new Twilio(config.TWILIO_ACCOUNT_SID, config.TWILIO_AUTH_TOKEN)
 
 exports.analyzeEmailAndReply = function() {
@@ -145,16 +146,26 @@ function createContactObject(email) {
     const from_string = email.headers.filter((head) => {
       return head.name === 'From'
     })[0].value
-    const email_string = from_string.match(/(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/)[0]
+    // const email_string = from_string.match(/(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/)[0]
     const name = from_string.slice(0, from_string.indexOf('<') - 1).split(' ')
     const first_name = name[0]
     const last_name = name[1]
-    extract_phone(email.body).then((phoneNums) => {
+
+    let phone_number
+    // let email_address
+
+    extract_phone(email.body)
+    .then((phoneNums) => {
+      phone_number = phoneNums[0]
+      return extract_email(email.body)
+    })
+    .then((data) => {
+      // email_address = data[0]
       const contactObj = {
         first_name: first_name,
         last_name: last_name,
-        email: email_string,
-        phone: phoneNums[0]
+        email: data[0],
+        phone: phone_number,
       }
       res(contactObj)
     })
