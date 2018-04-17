@@ -108,15 +108,16 @@ exports.determineIfRelevantEmail = function(email, corporation_id) {
     const assumed_email = froms.filter((sum) => {
                             return sum.match(/(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/)
                           })[0]
-    if (summ_froms.indexOf('noreply') > -1 || summ_froms.indexOf('no-reply') > -1) {
-      console.log('irrelevant')
-      res(false)
-    } else if (summ_froms.indexOf('zlead.co') > -1 || summ_froms.indexOf('rts.kijiji.ca') > -1 || summ_froms.indexOf('renthero.ca') > -1) {
-      console.log('good -- relevant')
-      res(assumed_email)
-    } else {
+    // if (summ_froms.indexOf('noreply') > -1 || summ_froms.indexOf('no-reply') > -1) {
+    //   console.log('irrelevant')
+    //   res(false)
+    // } else if (summ_froms.indexOf('zlead.co') > -1 || summ_froms.indexOf('rts.kijiji.ca') > -1 || summ_froms.indexOf('renthero.ca') > -1) {
+    //   console.log('good -- relevant')
+    //   res(assumed_email)
+    // } else {
       getContactsAndLeadsEmailsForCorporation(corporation_id)
         .then((whitelist) => {
+          console.log('====== WHITELIST ======')
           console.log(whitelist)
           let passWhitelist = false
           whitelist.forEach((w) => {
@@ -135,7 +136,7 @@ exports.determineIfRelevantEmail = function(email, corporation_id) {
           console.log('failed-to-get-linked-emails-for-corporation')
           res(false)
         })
-    }
+    // }
   })
   return p
 }

@@ -9,6 +9,7 @@ const getTwilioChannelId = require('../../Postgres/Queries/ChatQueries').getTwil
 const determineIfNewPersonalContact = require('../../Postgres/Queries/UserQueries').determineIfNewPersonalContact
 const createNewLead = require('../../Postgres/Queries/UserQueries').createNewLead
 const extract_phone = require('./extraction_api').extract_phone
+const extract_email = require('./extraction_api').extract_email
 const checkIfWeAskedForTheirPersonalEmailYet = require('./extraction_api').checkIfWeAskedForTheirPersonalEmailYet
 const doesThisEmailMentionTheirPersonalEmail = require('./extraction_api').doesThisEmailMentionTheirPersonalEmail
 const determineIfRelevantEmail = require('./extraction_api').determineIfRelevantEmail
@@ -18,10 +19,15 @@ exports.process_email = function(email, corporation_id, user_id) {
   const p = new Promise((res, rej) => {
     console.log(email)
     console.log('============= incomingEmail ================')
-    determineIfRelevantEmail(email)
+    determineIfRelevantEmail(email, corporation_id)
       .then((assumed_email) => {
         if (assumed_email) {
-          return determineIfNewPersonalContact(assumed_email)
+          console.log('===> assumed_email: ', assumed_email)
+          return extract_email(assumed_email)
+                .then((extracted_email) => {
+                  console.log('====> extracted email: ', extracted_email)
+                  return determineIfNewPersonalContact(extracted_email[0], corporation_id)
+                })
         } else {
           res('irrelevant email')
         }
@@ -42,12 +48,18 @@ exports.process_email = function(email, corporation_id, user_id) {
                               channelId = data.channel_id
                               return associate_channel_id(data.channel_id, corporation_id, contactObj.contact_id)
                             } else {
-                              return create_channel(corporation_id, email, contactObj.contact_id)
+                              console.log('========= CREATE CHANNEL =========')
+                              return generateObjectFromEmail(email)
+                                      .then((emailData) => {
+                                        return create_channel(corporation_id, emailData, contactObj.contact_id)
+                                      })
                                       .then((channelData) => {
+                                        console.log(channelData)
                                         channelId = channelData.channelSid
-                                        return associate_channel_id(channelData.channelSid, email, contactObj.contact_id)
+                                        return associate_channel_id(channelData.channelSid, corporation_id, contactObj.contact_id)
                                       })
                                       .catch((err) => {
+                                        console.log(err)
                                         return Promise.reject(err)
                                       })
                             }

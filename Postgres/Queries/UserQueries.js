@@ -59,12 +59,14 @@ exports.getContactsAndLeadsEmailsForCorporation = (corporation_id) => {
 
     return query(get_linked, values)
       .then((data) => {
+        // console.log(data)
         return stringify_rows(data)
       })
       .then((data) => {
         return json_rows(data)
       })
       .then((data) => {
+        // console.log(data)
         res(data)
       })
       .catch((err) => {
