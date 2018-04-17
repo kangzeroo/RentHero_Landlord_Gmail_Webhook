@@ -44,7 +44,8 @@ exports.associate_channel_id = (channel_id, corporation_id, contact_id) => {
     console.log(values)
     const insert_channel_id = `INSERT INTO chat_channels (channel_id, corporation_id, contact_id)
                                     VALUES ($1, $2, $3)
-                                  ON CONFLICT (channel_id, corporation_id, contact_id) DO NOTHING
+                                  ON CONFLICT (channel_id, corporation_id, contact_id) DO
+                                    UPDATE SET updated_at = CURRENT_TIMESTAMP
                               `
 
     return query(insert_channel_id, values)
